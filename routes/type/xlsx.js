@@ -16,11 +16,11 @@ router.route('/')
             .on('file', (name, file) => {
                 switch (name) {
                     case 'template_file':
-                        console.log(`template_file - PATH "${file.filepath}" and MIMETYPE "${file.mimetype}"`, )
+                        console.log(`template_file - PATH "${file.filepath}" and MIMETYPE "${file.mimetype}"`,)
                         template_path = file.filepath
                         break;
                     case 'data_file':
-                        console.log(`data_file - PATH "${file.filepath}" and MIMETYPE "${file.mimetype}"`, )
+                        console.log(`data_file - PATH "${file.filepath}" and MIMETYPE "${file.mimetype}"`,)
                         data_path = file.filepath
                         break;
                 }
@@ -43,40 +43,39 @@ router.route('/')
             })
     })
 
-var default_workbook, default_worksheet, default_json = null
 function renderWorksheet(templatePath, data) {
-    if ( default_json === null ) {
-        default_workbook = XLSX.readFileSync(templatePath)
-        default_worksheet = default_workbook.Sheets[default_workbook.SheetNames[0]]
-        default_json = XLSX.utils.sheet_to_json(default_worksheet)
-    }
-    
-    let updated_json = generateWorksheetJson(default_json, data)
+    let wb = XLSX.readFileSync(templatePath)
+    let ws = wb.Sheets[wb.SheetNames[0]]
+    let ref = XLSX.utils.decode_range(ws["!ref"]);
 
-    let new_workbook = XLSX.utils.book_new();
-    let updated_worksheet = XLSX.utils.json_to_sheet(updated_json)
-    XLSX.utils.book_append_sheet(new_workbook, updated_worksheet, "Page");
-    
-    return XLSX.write(new_workbook, { type:"buffer", bookType:"xlsx" });
+    var wscols = new Array();
+
+    for (var r = ref.s.r; r <= ref.e.r; r++) {
+        for (var c = ref.s.c; c <= ref.e.c; c++) {
+            if (r === ref.s.r) {
+                wscols.push({ wpx: 9 })
+            }
+            
+            let cell_name = XLSX.utils.encode_cell({ c: c, r: r });
+            if (ws[cell_name]) {
+                let current_value = ws[cell_name].v.toString()
+                let update_value = updateCellValue(current_value)
+                ws[cell_name] = { t: 's', v: update_value };
+            } else {
+                continue;
+            }
+        }
+    }
+
+    ws['!cols'] = wscols;
+    ws["!ref"] = XLSX.utils.encode_range(ref);
+
+    return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 }
 
-function generateWorksheetJson(json, data = null) {
-    let string_from_json = JSON.stringify(json)
-
-    let index = '001'
-    let day = '2'
-    let month = 'августа'
-    let year = '2022'
-    let number_plate = 'AS-2312'
-    let number_garage = '4Д'
-    string_from_json = string_from_json.replaceAll('#index#', index)
-    string_from_json = string_from_json.replaceAll('#day#', day)
-    string_from_json = string_from_json.replaceAll('#month#', month)
-    string_from_json = string_from_json.replaceAll('#year#', year)
-    string_from_json = string_from_json.replaceAll('#number_plate#', number_plate)
-    string_from_json = string_from_json.replaceAll('#number_garage#', number_garage)
-
-    return JSON.parse(string_from_json)
+function updateCellValue(currentValue) {
+    let new_value = currentValue.replaceAll('#index#', '001')
+    return new_value
 }
 
 module.exports = router;
