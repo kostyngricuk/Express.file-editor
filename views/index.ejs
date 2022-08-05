@@ -7,8 +7,8 @@
   <body>
     <h1><%= title %></h1>
     <p>Пожалуйста загрузите ваш файл в форму ниже:</p>
-    <form id="upload-form" class="form">
-      <div class="form-input"><input type="file" name="upload-file" id="upload-file"></div>
+    <form id="upload-form" class="form" enctype="multipart/form-data" method="post" action="/xlsx">
+      <div class="form-input"><input type="file" name="upload_file" id="upload_file"></div>
       <div class="form-input"><input type="submit" value="Загрузить"></div>
     </form>
   </body>
