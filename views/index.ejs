@@ -8,8 +8,17 @@
     <h1><%= title %></h1>
     <p>Пожалуйста загрузите ваш файл в форму ниже:</p>
     <form id="upload-form" class="form" enctype="multipart/form-data" method="post" action="/xlsx">
-      <div class="form-input"><input type="file" name="upload_file" id="upload_file"></div>
-      <div class="form-input"><input type="submit" value="Загрузить"></div>
+      <label class="form-input">
+        <span>Выберите файл с шаблоном (.xlsx):</span>
+        <input type="file" name="template_file" id="template_file" accept=".xlsx" required>
+      </label>
+      <label class="form-input">
+        <span>Выберите файл с данными (.json):</span>
+        <input type="file" name="data_file" id="data_file" accept=".json" required>
+      </label>
+      <div class="form-input">
+        <input type="submit" value="Обработать" class="btn">
+      </div>
     </form>
   </body>
 

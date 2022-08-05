@@ -1,6 +1,23 @@
+:root {
+  --main-color: rgb(0, 183, 255);
+}
+
 body {
   padding: 50px 15px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+  font: 14px Arial, sans-serif;
+}
+
+.btn {
+  padding: 0.5em 2em;
+  background-color: var(--main-color);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 400;
+}
+.btn:hover {
+  background-color: #000;
 }
 
 .form {
@@ -17,6 +34,10 @@ body {
 }
 .form-input + .form-input {
   margin-top: 1em;
+}
+.form-input span {
+  display: block;
+  margin-bottom: 0.5em;
 }
 .form-response {
   color: green;
