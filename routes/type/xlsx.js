@@ -2,25 +2,44 @@ const express = require('express');
 const router = express.Router();
 
 const fs = require('fs')
+const path = require('path')
 const formidable = require('formidable')
 const XLSX = require('xlsx')
+
+const resault_folder = 'uploads'
 
 /* GET xlsx */
 router.route('/')
     .post((req, res, next) => {
-        let template_path, data_path = null
+        let template_path, data_path, number_start, number_end, date_start, date_end = null
+        let use_strict = false
         new formidable.IncomingForm().parse(req)
             .on('field', (name, field) => {
-                console.log('Field', name, field)
+                console.log(`Field name: ${name}, Field value: ${field}`)
+                switch (name) {
+                    case 'number_start':
+                        number_start = field?field:1
+                        break;
+                    case 'number_end':
+                        number_end = field?field:999
+                        break;
+                    case 'date_start':
+                        date_start = new Date(field)
+                        break;
+                    case 'date_end':
+                        date_end = new Date(field)
+                        break;
+                    case 'use_strict':
+                        use_strict = true
+                        break;
+                }
             })
             .on('file', (name, file) => {
                 switch (name) {
                     case 'template_file':
-                        console.log(`template_file - PATH "${file.filepath}" and MIMETYPE "${file.mimetype}"`,)
                         template_path = file.filepath
                         break;
                     case 'data_file':
-                        console.log(`data_file - PATH "${file.filepath}" and MIMETYPE "${file.mimetype}"`,)
                         data_path = file.filepath
                         break;
                 }
@@ -34,14 +53,51 @@ router.route('/')
             })
             .on('end', () => {
                 let data_json = JSON.parse(fs.readFileSync(data_path))
-                let buffer = renderWorksheet(template_path, data_json)
 
-                res.statusCode = 200;
-                res.setHeader('Content-Disposition', 'attachment; filename="result.xlsx"');
-                res.setHeader('Content-Type', 'application/vnd.ms-excel');
-                res.end(buffer);
+                while (date_start <= date_end) {
+                    let resFilePath = generateFileFolders(date_start, use_strict)
+
+                    console.log(resFilePath)
+
+                    let next_day = date_start.setDate(date_start.getDate() + 1);
+                    date_start = new Date(next_day);
+                }
+
+                // let buffer = renderWorksheet(template_path, data_json)res.statusCode = 200;
+                // res.setHeader('Content-Disposition', 'attachment; filename="result.xlsx"');
+                // res.setHeader('Content-Type', 'application/vnd.ms-excel');
+                // res.end(buffer);
             })
     })
+
+function generateFileFolders(dateStart, useStrict = false) {
+    // current day folder
+    let res_folder = path.join(resault_folder, new Date().toDateString())
+    if ( !fs.existsSync(res_folder) ) {
+        fs.mkdirSync(res_folder)
+    }
+
+    // sub folders (strict)
+    if ( useStrict ) {
+        let date_year = dateStart.getFullYear().toString()
+        let date_month = (dateStart.getMonth() + 1).toString()
+        let date_day = dateStart.getDate().toString()
+        if ( !fs.existsSync(path.join(res_folder, date_year)) ) {
+            fs.mkdirSync(path.join(res_folder, date_year));
+        }
+        if ( !fs.existsSync(path.join(res_folder, date_year, date_month)) ) {
+            fs.mkdirSync(path.join(res_folder, date_year, date_month));
+        }
+
+        let filePath = path.join(res_folder, date_year, date_month, date_day)
+        if ( !fs.existsSync(filePath) ) {
+            fs.mkdirSync(filePath);
+        }
+        return filePath
+    }
+
+    return res_folder
+}
 
 function renderWorksheet(templatePath, data) {
     let wb = XLSX.readFileSync(templatePath)

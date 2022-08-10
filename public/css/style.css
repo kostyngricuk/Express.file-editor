@@ -29,9 +29,26 @@ body {
   flex-wrap: wrap;
   justify-content: space-between;
 }
-.form input[type="file"] {
+.form-input {
+  display: flex;
+  flex-wrap: wrap;
+}
+.form-input input:not([type="checkbox"]) {
   width: 100%;
 }
+.form-input input[type="checkbox"] {
+  margin: 0 0.5em 0 0;
+}
+.form-input_full-width {
+  width: 100%;
+}
+.form-input_small {
+  width: 100px;
+}
+.form-input_half {
+  width: calc(50% - 10px);
+}
+
 .form-input + .form-input {
   margin-top: 1em;
 }
