@@ -2,43 +2,49 @@
 <html>
   <head>
     <title><%= title %></title>
+    <link rel='stylesheet' href='/assets/css/normalize.min.css' />
     <link rel='stylesheet' href='/assets/css/style.css' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
   <body>
-    <h1><%= title %></h1>
-    <p>Пожалуйста загрузите ваш файл в форму ниже:</p>
-    <form id="upload-form" class="form" enctype="multipart/form-data" method="post" action="/xlsx">
-      <label class="form-input form-input_full-width">
-        <span>Выберите файл с шаблоном (.xlsx):</span>
-        <input type="file" name="template_file" id="template_file" accept=".xlsx" required>
-      </label>
-      <label class="form-input form-input_full-width">
-        <span>Выберите файл с данными (.json):</span>
-        <input type="file" name="data_file" id="data_file" accept=".json" required>
-      </label>
-      <label class="form-input form-input_half">
-        <span>Дата начала:</span>
-        <input type="date" name="date_start" id="date_start" required>
-      </label>
-      <label class="form-input form-input_half">
-        <span>Дата конца:</span>
-        <input type="date" name="date_end" id="date_end" required>
-      </label>
-      <label class="form-input form-input_half">
-        <span>Первый №:</span>
-        <input type="number" placeholder="1" name="number_start" id="number_start">
-      </label>
-      <label class="form-input form-input_half">
-        <span>Последний №:</span>
-        <input type="number" placeholder="999" name="number_end" id="number_end">
-      </label>
-      <label class="form-input form-input_full-width">
-        <input type="checkbox" checked name="use_strict" id="use_strict"> Структуризация папок
-      </label>
-      <div class="form-input form-input_full-width">
-        <input type="submit" value="Обработать" class="btn">
+    <main id="content" class="main main_center">
+      <div class="container">
+        <h1><%= title %></h1>
+        <form id="upload-form" class="form" enctype="multipart/form-data" method="post" action="/xlsx">
+          <label class="form-input form-input_full-width">
+            <span>Выберите файл с шаблоном (.xlsx):</span>
+            <input type="file" name="template_file" id="template_file" accept=".xlsx" required>
+          </label>
+          <label class="form-input form-input_full-width">
+            <span>Выберите файл с данными (.json):</span>
+            <input type="file" name="data_file" id="data_file" accept=".json" required>
+          </label>
+          <label class="form-input form-input_half">
+            <span>Дата начала:</span>
+            <input type="date" name="date_start" id="date_start" required>
+          </label>
+          <label class="form-input form-input_half">
+            <span>Дата конца:</span>
+            <input type="date" name="date_end" id="date_end" required>
+          </label>
+          <label class="form-input form-input_half">
+            <span>Первый №:</span>
+            <input type="number" placeholder="1" name="number_start" id="number_start">
+          </label>
+          <label class="form-input form-input_half">
+            <span>Последний №:</span>
+            <input type="number" placeholder="999" name="number_end" id="number_end">
+          </label>
+          <label class="form-input form-input_full-width">
+            <input type="checkbox" checked name="use_strict" id="use_strict"> Структуризация папок
+          </label>
+          <div class="form-input form-input_full-width">
+            <input type="submit" value="Обработать" class="btn">
+          </div>
+        </form>
       </div>
-    </form>
+    </main>
+    
   </body>
 
   <script src="/assets/js/script.js"></script>

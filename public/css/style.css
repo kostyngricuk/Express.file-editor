@@ -2,9 +2,26 @@
   --main-color: rgb(0, 183, 255);
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
-  padding: 50px 15px;
+  padding: 50px 0;
+  margin: 0;
   font: 14px Arial, sans-serif;
+}
+
+.container {
+  padding: 0 15px;
+}
+
+.main_center {
+  text-align: center;
+}
+.main_center form {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .btn {
@@ -23,11 +40,12 @@ body {
 .form {
   padding: 15px;
   border: 1px dashed lightgray;
-  max-width: 325px;
-  width: 100%;
+  max-width: 100%;
+  width: 325px;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
+  margin: 2.5rem 0;
 }
 .form-input {
   display: flex;
