@@ -85,6 +85,9 @@ router.route('/')
 
 function generateFileFolders(dateStart, useStrict = false) {
     // current day folder
+    if ( !fs.existsSync(resault_folder) ) {
+        fs.mkdirSync(resault_folder)
+    }
     let res_folder = path.join(resault_folder, new Date().toDateString().replaceAll(' ', '_'))
     if ( !fs.existsSync(res_folder) ) {
         fs.mkdirSync(res_folder)
