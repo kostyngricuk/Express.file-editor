@@ -28,15 +28,8 @@
             <input type="date" name="date_end" id="date_end" required>
           </label>
           <label class="form-input form-input_half">
-            <span>Первый №:</span>
-            <input type="number" placeholder="1" name="number_start" id="number_start">
-          </label>
-          <label class="form-input form-input_half">
-            <span>Последний №:</span>
-            <input type="number" placeholder="999" name="number_end" id="number_end">
-          </label>
-          <label class="form-input form-input_full-width">
-            <input type="checkbox" checked name="use_strict" id="use_strict"> Структуризация папок
+            <span>Начать с номера:</span>
+            <input type="number" placeholder="1" name="number_start" id="number_start" min="1" max="999">
           </label>
           <div class="form-input form-input_full-width">
             <input type="submit" value="Обработать" class="btn">

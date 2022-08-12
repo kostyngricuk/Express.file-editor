@@ -5,7 +5,10 @@ const fs = require('fs')
 const path = require('path')
 const formidable = require('formidable')
 const XLSX = require('xlsx')
-const logger = require('npmlog');
+const logger = require('npmlog')
+const moment = require('moment')
+
+moment.locale('ru')
 
 const resault_folder = 'uploads'
 const reserved_data_keys = ['file_name']
@@ -13,8 +16,9 @@ const reserved_data_keys = ['file_name']
 /* GET xlsx */
 router.route('/')
     .post((req, res, next) => {
-        let data_json, template_path, data_path, number_start, number_end, date_start, date_end = null
-        let use_strict = false
+        let data_json, template_path, data_path, number_start, date_start, date_end = null
+        let number_min = 1
+        let number_max = 999
 
         new formidable.IncomingForm().parse(req)
             .on('field', (name, field) => {
@@ -23,17 +27,11 @@ router.route('/')
                     case 'number_start':
                         number_start = field?field:1
                         break;
-                    case 'number_end':
-                        number_end = field?field:999
-                        break;
                     case 'date_start':
                         date_start = new Date(field)
                         break;
                     case 'date_end':
                         date_end = new Date(field)
-                        break;
-                    case 'use_strict':
-                        use_strict = true
                         break;
                 }
             })
@@ -60,33 +58,34 @@ router.route('/')
 
                     let number_loop = number_start - 1
                     let date_loop = date_start
+                    let file_saved_index = 0
                     while (date_loop <= date_end) {
-                        let file_save_path = generateFileFolders(date_loop, use_strict)
+                        let file_save_path = generateFileFolders(date_loop)
 
                         Array.from(data_json).map( (data, index) => {
                             // NUMBER LOOP START
-                            if ( number_loop >= number_end ) {
-                                number_loop = -1
+                            if ( number_loop >= number_max ) {
+                                number_loop = number_min - 1
                             }
                             data.index_1 = ++number_loop
 
-                            if ( number_loop >= number_end ) {
-                                number_loop = -1
+                            if ( number_loop >= number_max ) {
+                                number_loop = number_min - 1
                             }
-                            data.index_2 = ++number_loop
+                            data.index_2 = data.postfix?data.index_1:++number_loop
                             // NUMBER LOOP END
                             
-                            data.day = date_loop.getDate().toString()
-                            data.month = getStringMonth(date_loop)
-                            data.year = date_loop.getFullYear().toString()
+                            let date = moment(date_loop).format('LL').split(' ')
+                            data.day = date[0]
+                            data.month = date[1]
+                            data.year = date[2]
 
-                            let file_name = data.file_name
-                            if (!use_strict) {
-                                file_name += '-' + date_loop.toDateString().replaceAll(' ', '_')
-                            }
+                            let file_name = `${file_saved_index} - ${moment(date_loop).format('L')} (${data.index_1}-${data.index_2}) ` + data.file_name
 
                             // Create file .xlsx
                             renderWorksheet(file_save_path, file_name, template_path, data)
+                            
+                            file_saved_index++
                         })
 
                         logger.info('XLSX', 'Loading ...')
@@ -105,33 +104,14 @@ router.route('/')
             })
     })
 
-function generateFileFolders(dateLoop, useStrict = false) {
+function generateFileFolders(dateLoop) {
     // current day folder
     if ( !fs.existsSync(resault_folder) ) {
         fs.mkdirSync(resault_folder)
     }
-    let res_folder = path.join(resault_folder, new Date().toDateString().replaceAll(' ', '_'))
+    let res_folder = path.join(resault_folder, `${moment(dateLoop).format('L')}`)
     if ( !fs.existsSync(res_folder) ) {
         fs.mkdirSync(res_folder)
-    }
-
-    // sub folders (strict)
-    if ( useStrict ) {
-        let date_year = dateLoop.getFullYear().toString()
-        let date_month = (dateLoop.getMonth() + 1).toString()
-        let date_day = dateLoop.getDate().toString()
-        if ( !fs.existsSync(path.join(res_folder, date_year)) ) {
-            fs.mkdirSync(path.join(res_folder, date_year));
-        }
-        if ( !fs.existsSync(path.join(res_folder, date_year, date_month)) ) {
-            fs.mkdirSync(path.join(res_folder, date_year, date_month));
-        }
-
-        let filePath = path.join(res_folder, date_year, date_month, date_day)
-        if ( !fs.existsSync(filePath) ) {
-            fs.mkdirSync(filePath);
-        }
-        return filePath
     }
 
     return res_folder
@@ -169,12 +149,6 @@ function renderWorksheet(fileSavePath, fileName, templatePath, data) {
         themeXLSX: true, 
         compression: true
     })
-}
-
-function getStringMonth(date) {
-    return date.toLocaleString('ru', {       
-        month: 'long'       
-      });
 }
 
 module.exports = router;
