@@ -58,28 +58,34 @@ router.route('/')
                 try {
                     data_json = JSON.parse(fs.readFileSync(data_path))
 
-                    let number_loop = number_start
+                    let number_loop = number_start - 1
                     let date_loop = date_start
                     while (date_loop <= date_end) {
                         let file_save_path = generateFileFolders(date_loop, use_strict)
 
                         Array.from(data_json).map( (data, index) => {
-                            data.day = date_loop.getDate().toString()
-                            data.month = (date_loop.getMonth() + 1).toString()
-                            data.year = date_loop.getFullYear().toString()
-                            if ( !data.postfix ) {
-                                data.index = number_loop
-                                number_loop++
+                            // NUMBER LOOP START
+                            if ( number_loop >= number_end ) {
+                                number_loop = -1
                             }
-                            if ( number_loop > number_end ) {
-                                number_loop = 0
+                            data.index_1 = ++number_loop
+
+                            if ( number_loop >= number_end ) {
+                                number_loop = -1
                             }
+                            data.index_2 = ++number_loop
+                            // NUMBER LOOP END
                             
+                            data.day = date_loop.getDate().toString()
+                            data.month = getStringMonth(date_loop)
+                            data.year = date_loop.getFullYear().toString()
 
                             let file_name = data.file_name
                             if (!use_strict) {
                                 file_name += '-' + date_loop.toDateString().replaceAll(' ', '_')
                             }
+
+                            // Create file .xlsx
                             renderWorksheet(file_save_path, file_name, template_path, data)
                         })
 
@@ -163,6 +169,12 @@ function renderWorksheet(fileSavePath, fileName, templatePath, data) {
         themeXLSX: true, 
         compression: true
     })
+}
+
+function getStringMonth(date) {
+    return date.toLocaleString('ru', {       
+        month: 'long'       
+      });
 }
 
 module.exports = router;
