@@ -4,7 +4,7 @@ const router = express.Router();
 const fs = require('fs')
 const path = require('path')
 const formidable = require('formidable')
-const XLSX = require('xlsx')
+const ExcelJS = require('exceljs')
 const logger = require('npmlog')
 const moment = require('moment')
 
@@ -16,7 +16,7 @@ const reserved_data_keys = ['file_name']
 /* GET xlsx */
 router.route('/')
     .post((req, res, next) => {
-        let data_json, template_path, data_path, number_start, date_start, date_end = null
+        let data_json, template_buffer, data_path, number_start, date_start, date_end = null
         let number_min = 1
         let number_max = 999
 
@@ -38,7 +38,7 @@ router.route('/')
             .on('file', (name, file) => {
                 switch (name) {
                     case 'template_file':
-                        template_path = file.filepath
+                        template_buffer = fs.readFileSync(file.filepath)
                         break;
                     case 'data_file':
                         data_path = file.filepath
@@ -73,6 +73,10 @@ router.route('/')
                                 number_loop = number_min - 1
                             }
                             data.index_2 = data.postfix?data.index_1:++number_loop
+
+                            data.index_1 = data.index_1.toString().padStart(4, "0");
+                            data.index_2 = data.index_2.toString().padStart(4, "0");
+                            
                             // NUMBER LOOP END
                             
                             let date = moment(date_loop).format('LL').split(' ')
@@ -83,7 +87,7 @@ router.route('/')
                             let file_name = `${file_saved_index} - ${moment(date_loop).format('L')} (${data.index_1}-${data.index_2}) ` + data.file_name
 
                             // Create file .xlsx
-                            renderWorksheet(file_save_path, file_name, template_path, data)
+                            renderWorksheet(file_save_path, file_name, template_buffer, data)
                             
                             file_saved_index++
                         })
@@ -117,38 +121,27 @@ function generateFileFolders(dateLoop) {
     return res_folder
 }
 
-function renderWorksheet(fileSavePath, fileName, templatePath, data) {
-    fileSavePath = path.join(fileSavePath, fileName+'.xlsx')
+async function renderWorksheet(fileSavePath, fileName, buffer, data) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
 
-    let wb = XLSX.readFileSync(templatePath, {
-        cellNF: true,
-        cellStyles: true
-    })
-    let ws = wb.Sheets[wb.SheetNames[0]]
-    let ref = XLSX.utils.decode_range(ws["!ref"]);
-
+    var worksheet = workbook.worksheets[0]; 
     Object.keys(data).map(data_key => {
         if ( !reserved_data_keys.includes(data_key) ) {
-            for (var R = ref.s.r; R <= ref.e.r; R++) {
-                for (var C = ref.s.c; C <= ref.e.c; C++) {
-                    let cell_name = XLSX.utils.encode_cell({ c: C, r: R });
-                    if (ws[cell_name] && ws[cell_name].t == 's') {
-                        Object.keys(ws[cell_name]).forEach(key => {
-                            let current_value = ws[cell_name][key].toString()
-                            ws[cell_name][key] = current_value.replace(`#${data_key}#`, data[data_key]);
-                        });
+            worksheet.eachRow(function(row, rowNumber) {
+                row.eachCell(function(cell, colNumber) {
+                    if (cell.value) {
+                        let current_value = cell.value.toString()
+                        cell.value = current_value.replaceAll(`#${data_key}#`, data[data_key].toString());
                     }
-                }
-            }
+                });
+            });
         }
     })
 
-    ws["!ref"] = XLSX.utils.encode_range(ref);
-
-    return XLSX.writeFile(wb, fileSavePath, {
-        themeXLSX: true, 
-        compression: true
-    })
+    fileSavePath = path.join(fileSavePath, fileName+'.xlsx')
+    const buffer_res = await workbook.xlsx.writeBuffer();
+    return fs.writeFileSync(fileSavePath, buffer_res);
 }
 
 module.exports = router;
