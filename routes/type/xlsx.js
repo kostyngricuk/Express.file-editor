@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const fs = require('fs')
+const AdmZip = require("adm-zip");
 const path = require('path')
 const formidable = require('formidable')
 const ExcelJS = require('exceljs')
@@ -13,10 +14,13 @@ moment.locale('ru')
 const resault_folder = 'uploads'
 const reserved_data_keys = ['file_name']
 
+const zip = new AdmZip();
+var zip_path;
+
 /* GET xlsx */
 router.route('/')
     .post((req, res, next) => {
-        let data_json, template_buffer, data_path, number_start, date_start, date_end = null
+        let data_json, template_buffer, data_path, number_start, date_start, date_end, email = null
         let number_min = 1
         let number_max = 999
 
@@ -25,13 +29,16 @@ router.route('/')
                 // logger.info('XLSX', `Field name: ${name}, Field value: ${field}`)
                 switch (name) {
                     case 'number_start':
-                        number_start = field?field:1
+                        number_start = field ? field : 1
                         break;
                     case 'date_start':
                         date_start = new Date(field)
                         break;
                     case 'date_end':
                         date_end = new Date(field)
+                        break;
+                    case 'email':
+                        email = field
                         break;
                 }
             })
@@ -56,29 +63,30 @@ router.route('/')
                 try {
                     data_json = JSON.parse(fs.readFileSync(data_path))
 
+                    zip_path = path.join(resault_folder, `${moment(Date.now()).format('L')}.zip`)
+                    zip.writeZip(zip_path);
+
                     let number_loop = number_start - 1
                     let date_loop = date_start
                     let file_saved_index = 0
                     while (date_loop <= date_end) {
-                        let file_save_path = generateFileFolders(date_loop)
-
-                        Array.from(data_json).map( (data, index) => {
+                        Array.from(data_json).map((data, index) => {
                             // NUMBER LOOP START
-                            if ( number_loop >= number_max ) {
+                            if (number_loop >= number_max) {
                                 number_loop = number_min - 1
                             }
                             data.index_1 = ++number_loop
 
-                            if ( number_loop >= number_max ) {
+                            if (number_loop >= number_max) {
                                 number_loop = number_min - 1
                             }
-                            data.index_2 = data.postfix?data.index_1:++number_loop
+                            data.index_2 = data.postfix ? data.index_1 : ++number_loop
 
                             data.index_1 = data.index_1.toString().padStart(4, "0");
                             data.index_2 = data.index_2.toString().padStart(4, "0");
-                            
+
                             // NUMBER LOOP END
-                            
+
                             let date = moment(date_loop).format('LL').split(' ')
                             data.day = date[0]
                             data.month = date[1]
@@ -87,8 +95,8 @@ router.route('/')
                             let file_name = `${file_saved_index} - ${moment(date_loop).format('L')} (${data.index_1}-${data.index_2}) ` + data.file_name
 
                             // Create file .xlsx
-                            renderWorksheet(file_save_path, file_name, template_buffer, data)
-                            
+                            renderWorksheet(file_name, template_buffer, data, date_loop)
+
                             file_saved_index++
                         })
 
@@ -99,7 +107,11 @@ router.route('/')
 
                     logger.info('XLSX', 'Processed successfully!')
                     res.statusCode = 200;
-                    res.end('Processed successfully!');
+                    res.render('success', {
+                        title: 'Обработка выполнена успешно',
+                        email: email,
+                        download_file_path: zip_path
+                    });
                 } catch (error) {
                     logger.error('XLSX', 'Processed with errors: %j', error)
                     res.statusCode = 500;
@@ -107,44 +119,44 @@ router.route('/')
                 }
             })
     })
-
-function generateFileFolders(dateLoop) {
-    // current day folder
-    if ( !fs.existsSync(resault_folder) ) {
-        fs.mkdirSync(resault_folder)
+async function updateZipArchive(filePath, buffer) {
+    try {
+        zip.addFile(filePath, buffer);
+        zip.writeZip(zip_path);
+    } catch (error) {
+        logger.error('ZIP - UPDATE', 'Processed with errors: %j', error)
     }
-    let res_folder = path.join(resault_folder, `${moment(dateLoop).format('L')}`)
-    if ( !fs.existsSync(res_folder) ) {
-        fs.mkdirSync(res_folder)
-    }
-
-    return res_folder
 }
 
-async function renderWorksheet(fileSavePath, fileName, buffer, data) {
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+async function renderWorksheet(fileName, buffer, data, dateLoop) {
+    try {
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
 
-    var worksheet = workbook.worksheets[0]; 
-    let count = 0
-    Object.keys(data).map(data_key => {
-        if ( !reserved_data_keys.includes(data_key) ) {
-            worksheet.eachRow(function(row, rowNumber) {
-                row.eachCell(function(cell, colNumber) {
-                    if (cell.value && cell.value.formula) {
-                        cell.value = { formula: cell.value.formula, result: cell.value.result.replaceAll(`#${data_key}#`, data[data_key]) }
-                    }
-                    if (cell.value && typeof cell.value == 'string') {
-                        cell.value = cell.value.replaceAll(`#${data_key}#`, data[data_key]);
-                    }
+        var worksheet = workbook.worksheets[0];
+        let count = 0
+        Object.keys(data).map(data_key => {
+            if (!reserved_data_keys.includes(data_key)) {
+                worksheet.eachRow(function (row, rowNumber) {
+                    row.eachCell(function (cell, colNumber) {
+                        if (cell.value && cell.value.formula) {
+                            cell.value = { formula: cell.value.formula, result: cell.value.result.replaceAll(`#${data_key}#`, data[data_key]) }
+                        }
+                        if (cell.value && typeof cell.value == 'string') {
+                            cell.value = cell.value.replaceAll(`#${data_key}#`, data[data_key]);
+                        }
+                    });
                 });
-            });
-        }
-    })
+            }
+        })
 
-    fileSavePath = path.join(fileSavePath, fileName+'.xlsx')
-    const buffer_res = await workbook.xlsx.writeBuffer();
-    return fs.writeFileSync(fileSavePath, buffer_res);
+        let file_path = path.join(`${moment(dateLoop).format('L')}`, fileName + '.xlsx')
+        const buffer_res = await workbook.xlsx.writeBuffer();
+
+        updateZipArchive(file_path, buffer_res)
+    } catch (error) {
+        logger.error('ExcelJS - UPDATE', 'Processed with errors: %j', error)
+    }
 }
 
 module.exports = router;
