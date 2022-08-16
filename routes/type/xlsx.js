@@ -126,13 +126,16 @@ async function renderWorksheet(fileSavePath, fileName, buffer, data) {
     await workbook.xlsx.load(buffer);
 
     var worksheet = workbook.worksheets[0]; 
+    let count = 0
     Object.keys(data).map(data_key => {
         if ( !reserved_data_keys.includes(data_key) ) {
             worksheet.eachRow(function(row, rowNumber) {
                 row.eachCell(function(cell, colNumber) {
-                    if (cell.value) {
-                        let current_value = cell.value.toString()
-                        cell.value = current_value.replaceAll(`#${data_key}#`, data[data_key].toString());
+                    if (cell.value && cell.value.formula) {
+                        cell.value = { formula: cell.value.formula, result: cell.value.result.replaceAll(`#${data_key}#`, data[data_key]) }
+                    }
+                    if (cell.value && typeof cell.value == 'string') {
+                        cell.value = cell.value.replaceAll(`#${data_key}#`, data[data_key]);
                     }
                 });
             });
