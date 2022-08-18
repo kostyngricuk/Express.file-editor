@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "nodemon ./bin/www"
+    "start": "nodemon ./bin/www",
+    "serve": "nohup node ./bin/www &"
   },
   "dependencies": {
     "adm-zip": "^0.5.9",
