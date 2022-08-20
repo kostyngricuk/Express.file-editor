@@ -110,16 +110,15 @@ router.route('/')
                     }
 
                     Promise.all(promises).then(() => {
-                        sendFileToEmail(email).then(() => {
-                            fs.unlink(zip_path)
-                            zip_path = ""
-                            logger.info('XLSX', 'Processed successfully!')
-                            res.statusCode = 200;
-                            res.render('success', {
-                                title: 'Обработка выполнена успешно',
-                                email: email,
-                            });
-                        }).catch(console.error);
+                        sendFileToEmail(email).catch(console.error);
+
+                        logger.info('XLSX', 'Processed successfully!')
+                        res.statusCode = 200;
+                        res.render('success', {
+                            title: 'Обработка выполнена успешно',
+                            email: email,
+                            download_file_path: zip_path
+                        });
                     })
                 } catch (error) {
                     logger.error('XLSX', 'Processed with errors: %j', error)
@@ -199,6 +198,7 @@ async function sendFileToEmail(email) {
         ]
     });
 
+    fs.unlink(zip_path)
     logger.info("MAIL", "Message sent: %s", info.messageId);
 }
 
