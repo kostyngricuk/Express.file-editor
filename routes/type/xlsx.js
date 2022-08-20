@@ -139,12 +139,15 @@ async function renderWorksheet(fileName, buffer, data, dateLoop) {
             if (!reserved_data_keys.includes(data_key)) {
                 worksheet.eachRow(function (row, rowNumber) {
                     row.eachCell(function (cell, colNumber) {
+                        let replace = `#${data_key}#`;
+                        let replace_regex = new RegExp(replace, 'g')
                         if (cell.value && cell.value.formula) {
-                            cell.value = { formula: cell.value.formula, result: cell.value.result.replaceAll(`#${data_key}#`, data[data_key]) }
+                            let curretValue = cell.value.result.toString()
+                            cell.value = { formula: cell.value.formula, result: curretValue.replace(replace_regex, data[data_key]) }
                         }
                         if (cell.value && typeof cell.value == 'string') {
                             let curretValue = cell.value.toString()
-                            cell.value = curretValue.replaceAll(`#${data_key}#`, data[data_key]);
+                            cell.value = curretValue.replace(replace_regex, data[data_key]);
                         }
                     });
                 });
