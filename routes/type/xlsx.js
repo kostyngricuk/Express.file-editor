@@ -64,13 +64,15 @@ router.route('/')
             .on('end', () => {
                 try {
                     data_json = JSON.parse(fs.readFileSync(data_path))
-
                     zip_path = path.join(resault_folder, `${moment(Date.now()).format('L')}.zip`)
                     zip.writeZip(zip_path);
 
+                    
                     let number_loop = number_start - 1
                     let date_loop = date_start
                     let file_saved_index = 0
+                    
+                    let promises = []
                     while (date_loop <= date_end) {
                         Array.from(data_json).map((data, index) => {
                             // NUMBER LOOP START
@@ -97,7 +99,7 @@ router.route('/')
                             let file_name = `${file_saved_index} - ${moment(date_loop).format('L')} (${data.index_1}-${data.index_2}) ` + data.file_name
 
                             // Create file .xlsx
-                            renderWorksheet(file_name, template_buffer, data, date_loop)
+                            promises.push(renderWorksheet(file_name, template_buffer, data, date_loop))
 
                             file_saved_index++
                         })
@@ -107,14 +109,16 @@ router.route('/')
                         date_loop = new Date(date_loop.setDate(date_loop.getDate() + 1));
                     }
 
-                    sendFileToEmail(email).catch(console.error);
-                    logger.info('XLSX', 'Processed successfully!')
-                    res.statusCode = 200;
-                    res.render('success', {
-                        title: 'Обработка выполнена успешно',
-                        email: email,
-                        download_file_path: path.resolve(zip_path)
-                    });
+                    Promise.all(promises).then(() => {
+                        sendFileToEmail(email).catch(console.error);
+                        logger.info('XLSX', 'Processed successfully!')
+                        res.statusCode = 200;
+                        res.render('success', {
+                            title: 'Обработка выполнена успешно',
+                            email: email,
+                            download_file_path: zip_path
+                        });
+                    })
                 } catch (error) {
                     logger.error('XLSX', 'Processed with errors: %j', error)
                     res.statusCode = 500;
@@ -132,36 +136,34 @@ async function updateZipArchive(filePath, buffer) {
     }
 }
 
-function renderWorksheet(fileName, buffer, data, dateLoop) {
+async function renderWorksheet(fileName, buffer, data, dateLoop) {
     try {
         const workbook = new ExcelJS.Workbook();
-        workbook.xlsx.load(buffer).then(res => {
-            var worksheet = workbook.worksheets[0]; 
-            let count = 0
-            Object.keys(data).map(data_key => {
-                if (!reserved_data_keys.includes(data_key)) {
-                    worksheet.eachRow(function (row, rowNumber) {
-                        row.eachCell(function (cell, colNumber) {
-                            let replace = `#${data_key}#`;
-                            let replace_regex = new RegExp(replace, 'g')
-                            if (cell.value && cell.value.formula) {
-                                let curretValue = cell.value.result.toString()
-                                cell.value = { formula: cell.value.formula, result: curretValue.replace(replace_regex, data[data_key]) }
-                            }
-                            if (cell.value && typeof cell.value == 'string') {
-                                let curretValue = cell.value.toString()
-                                cell.value = curretValue.replace(replace_regex, data[data_key]);
-                            }
-                        });
+        await workbook.xlsx.load(buffer)
+        var worksheet = workbook.worksheets[0]; 
+        let count = 0
+        Object.keys(data).map(data_key => {
+            if (!reserved_data_keys.includes(data_key)) {
+                worksheet.eachRow(function (row, rowNumber) {
+                    row.eachCell(function (cell, colNumber) {
+                        let replace = `#${data_key}#`;
+                        let replace_regex = new RegExp(replace, 'g')
+                        if (cell.value && cell.value.formula) {
+                            let curretValue = cell.value.result.toString()
+                            cell.value = { formula: cell.value.formula, result: curretValue.replace(replace_regex, data[data_key]) }
+                        }
+                        if (cell.value && typeof cell.value == 'string') {
+                            let curretValue = cell.value.toString()
+                            cell.value = curretValue.replace(replace_regex, data[data_key]);
+                        }
                     });
-                }
-            })
-
-            let file_path = path.join(`${moment(dateLoop).format('L')}`, fileName + '.xlsx')
-            workbook.xlsx.writeBuffer().then(buffer_res => {
-                updateZipArchive(file_path, buffer_res)
-            })
+                });
+            }
         })
+
+        let file_path = path.join(`${moment(dateLoop).format('L')}`, fileName + '.xlsx')
+        let buffer_res = await workbook.xlsx.writeBuffer()
+        updateZipArchive(file_path, buffer_res)
     } catch (error) {
         logger.error('ExcelJS - UPDATE', 'Processed with errors: %j', error)
     }
@@ -178,25 +180,26 @@ async function sendFileToEmail(email) {
         auth: {
             user: process.env.SMTP_EMAIL,
             pass: process.env.SMTP_PASSWORD,
-        },
-        attachments: [  
-            {
-                path: path.resolve(zip_path),
-                contentType: 'application/zip'
-            }
-        ]
+        }
     };
+
+    console.log(mailConfig)
 
     let transporter = nodemailer.createTransport(mailConfig);
 
     let info = await transporter.sendMail({
         from: process.env.SMTP_EMAIL,
         to: email,
-        subject: "BulkEditor App - Files",
+        subject: "BulkEditor App - Loaded Files",
         html: "<h3>Спасибо что воспользовались BulkEditor App!</h3>",
+        attachments: [  
+            {
+                path: zip_path
+            }
+        ]
     });
 
-    console.log("Message sent: %s", info.messageId);
+    logger.info("MAIL", "Message sent: %s", info.messageId);
 }
 
 module.exports = router;
