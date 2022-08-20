@@ -181,7 +181,8 @@ async function sendFileToEmail(email) {
         },
         attachments: [  
             {
-                path: path.resolve(zip_path)
+                path: path.resolve(zip_path),
+                contentType: 'application/zip'
             }
         ]
     };
@@ -191,8 +192,8 @@ async function sendFileToEmail(email) {
     let info = await transporter.sendMail({
         from: process.env.SMTP_EMAIL,
         to: email,
-        subject: "BulkEditor - Files",
-        html: "<h3>Спасибо что воспользовались нашим сервисом!</h3>",
+        subject: "BulkEditor App - Files",
+        html: "<h3>Спасибо что воспользовались BulkEditor App!</h3>",
     });
 
     console.log("Message sent: %s", info.messageId);
