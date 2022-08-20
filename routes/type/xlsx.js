@@ -8,7 +8,9 @@ const formidable = require('formidable')
 const ExcelJS = require('exceljs')
 const logger = require('npmlog')
 const moment = require('moment')
+const nodemailer = require("nodemailer")
 
+require('dotenv').config()
 moment.locale('ru')
 
 const resault_folder = 'uploads'
@@ -105,12 +107,13 @@ router.route('/')
                         date_loop = new Date(date_loop.setDate(date_loop.getDate() + 1));
                     }
 
+                    sendFileToEmail(email).catch(console.error);
                     logger.info('XLSX', 'Processed successfully!')
                     res.statusCode = 200;
                     res.render('success', {
                         title: 'Обработка выполнена успешно',
                         email: email,
-                        download_file_path: zip_path
+                        download_file_path: path.resolve(zip_path)
                     });
                 } catch (error) {
                     logger.error('XLSX', 'Processed with errors: %j', error)
@@ -119,6 +122,7 @@ router.route('/')
                 }
             })
     })
+
 async function updateZipArchive(filePath, buffer) {
     try {
         zip.addFile(filePath, buffer);
@@ -128,39 +132,70 @@ async function updateZipArchive(filePath, buffer) {
     }
 }
 
-async function renderWorksheet(fileName, buffer, data, dateLoop) {
+function renderWorksheet(fileName, buffer, data, dateLoop) {
     try {
         const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(buffer);
-
-        var worksheet = workbook.worksheets[0];
-        let count = 0
-        Object.keys(data).map(data_key => {
-            if (!reserved_data_keys.includes(data_key)) {
-                worksheet.eachRow(function (row, rowNumber) {
-                    row.eachCell(function (cell, colNumber) {
-                        let replace = `#${data_key}#`;
-                        let replace_regex = new RegExp(replace, 'g')
-                        if (cell.value && cell.value.formula) {
-                            let curretValue = cell.value.result.toString()
-                            cell.value = { formula: cell.value.formula, result: curretValue.replace(replace_regex, data[data_key]) }
-                        }
-                        if (cell.value && typeof cell.value == 'string') {
-                            let curretValue = cell.value.toString()
-                            cell.value = curretValue.replace(replace_regex, data[data_key]);
-                        }
+        workbook.xlsx.load(buffer).then(res => {
+            var worksheet = workbook.worksheets[0]; 
+            let count = 0
+            Object.keys(data).map(data_key => {
+                if (!reserved_data_keys.includes(data_key)) {
+                    worksheet.eachRow(function (row, rowNumber) {
+                        row.eachCell(function (cell, colNumber) {
+                            let replace = `#${data_key}#`;
+                            let replace_regex = new RegExp(replace, 'g')
+                            if (cell.value && cell.value.formula) {
+                                let curretValue = cell.value.result.toString()
+                                cell.value = { formula: cell.value.formula, result: curretValue.replace(replace_regex, data[data_key]) }
+                            }
+                            if (cell.value && typeof cell.value == 'string') {
+                                let curretValue = cell.value.toString()
+                                cell.value = curretValue.replace(replace_regex, data[data_key]);
+                            }
+                        });
                     });
-                });
-            }
+                }
+            })
+
+            let file_path = path.join(`${moment(dateLoop).format('L')}`, fileName + '.xlsx')
+            workbook.xlsx.writeBuffer().then(buffer_res => {
+                updateZipArchive(file_path, buffer_res)
+            })
         })
-
-        let file_path = path.join(`${moment(dateLoop).format('L')}`, fileName + '.xlsx')
-        const buffer_res = await workbook.xlsx.writeBuffer();
-
-        updateZipArchive(file_path, buffer_res)
     } catch (error) {
         logger.error('ExcelJS - UPDATE', 'Processed with errors: %j', error)
     }
+}
+
+async function sendFileToEmail(email) {
+    let mailConfig;
+    
+    mailConfig = {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT, 
+        secure: true,
+        authMethod: 'LOGIN',
+        auth: {
+            user: process.env.SMTP_EMAIL,
+            pass: process.env.SMTP_PASSWORD,
+        },
+        attachments: [  
+            {
+                path: path.resolve(zip_path)
+            }
+        ]
+    };
+
+    let transporter = nodemailer.createTransport(mailConfig);
+
+    let info = await transporter.sendMail({
+        from: process.env.SMTP_EMAIL,
+        to: email,
+        subject: "BulkEditor - Files",
+        html: "<h3>Спасибо что воспользовались нашим сервисом!</h3>",
+    });
+
+    console.log("Message sent: %s", info.messageId);
 }
 
 module.exports = router;
