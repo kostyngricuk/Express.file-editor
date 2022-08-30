@@ -197,7 +197,7 @@ async function sendFileToEmail(email) {
         ]
     });
 
-    // fs.unlinkSync(zip_path)
+    fs.unlinkSync(zip_path)
     logger.info("MAIL", "Message sent: %s", info.messageId);
 }
 
