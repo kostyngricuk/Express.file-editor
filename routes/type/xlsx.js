@@ -8,7 +8,8 @@ const formidable = require('formidable')
 const ExcelJS = require('exceljs')
 const logger = require('npmlog')
 const moment = require('moment')
-const nodemailer = require("nodemailer")
+const nodemailer = require("nodemailer");
+const { render } = require('ejs');
 
 require('dotenv').config()
 moment.locale('ru')
@@ -17,15 +18,18 @@ const resault_folder = 'uploads'
 const reserved_data_keys = ['file_name']
 
 const zip = new AdmZip();
-var zip_path;
+var zip_path = path.join(resault_folder, `${moment(Date.now()).format('L')}.zip`)
 
+
+var data_json, template_buffer, data_path, number_start, date_start, date_end, email = null
+var number_min = 1
+var number_max = 999
+var number_loop = 0
+
+var res_buffers = []
 /* GET xlsx */
 router.route('/')
     .post((req, res, next) => {
-        let data_json, template_buffer, data_path, number_start, date_start, date_end, email = null
-        let number_min = 1
-        let number_max = 999
-
         new formidable.IncomingForm().parse(req)
             .on('field', (name, field) => {
                 // logger.info('XLSX', `Field name: ${name}, Field value: ${field}`)
@@ -64,54 +68,30 @@ router.route('/')
             .on('end', () => {
                 try {
                     data_json = JSON.parse(fs.readFileSync(data_path))
-                    zip_path = path.join(resault_folder, `${moment(Date.now()).format('L')}.zip`)
-                    zip.writeZip(zip_path);
-
                     
-                    let number_loop = number_start - 1
-                    let date_loop = date_start
-                    let file_saved_index = 0
+                    number_loop = number_start - 1
                     
                     let promises = []
+
+                    let date_loop = date_start
                     while (date_loop <= date_end) {
+                        let date = moment(date_loop)
                         Array.from(data_json).map((data, index) => {
-                            // NUMBER LOOP START
-                            if (number_loop >= number_max) {
-                                number_loop = number_min - 1
-                            }
-                            data.index_1 = ++number_loop
-
-                            if (number_loop >= number_max) {
-                                number_loop = number_min - 1
-                            }
-                            data.index_2 = data.postfix ? data.index_1 : ++number_loop
-
-                            data.index_1 = data.index_1.toString().padStart(4, "0");
-                            data.index_2 = data.index_2.toString().padStart(4, "0");
-
-                            // NUMBER LOOP END
-
-                            let date = moment(date_loop).format('LL').split(' ')
-                            data.day = date[0]
-                            data.month = date[1]
-                            data.year = date[2]
-
-                            let file_name = `${file_saved_index} - ${moment(date_loop).format('L')} (${data.index_1}-${data.index_2}) ` + data.file_name
-
-                            // Create file .xlsx
-                            promises.push(renderWorksheet(file_name, template_buffer, data, date_loop))
-
-                            file_saved_index++
+                            promises.push(renderWorksheet(date, data))
                         })
 
-                        logger.info('XLSX', 'Loading ...')
+                        logger.info('XLSX', date.format('L') + ' - Loading ...')
 
                         date_loop = new Date(date_loop.setDate(date_loop.getDate() + 1));
                     }
 
                     Promise.all(promises).then(() => {
+                        zip.writeZip(zip_path);
+
+                        // send files to email
                         sendFileToEmail(email).catch(console.error);
 
+                        // response
                         logger.info('XLSX', 'Processed successfully!')
                         res.statusCode = 200;
                         res.render('success', {
@@ -128,46 +108,65 @@ router.route('/')
             })
     })
 
-async function updateZipArchive(filePath, buffer) {
-    try {
-        zip.addFile(filePath, buffer);
-        zip.writeZip(zip_path);
-    } catch (error) {
-        logger.error('ZIP - UPDATE', 'Processed with errors: %j', error)
+function getObjectXLSX(date, data) {
+    // NUMBER LOOP START
+    if (number_loop >= number_max) {
+        number_loop = number_min - 1
     }
+    data.index_1 = ++number_loop
+
+    if (number_loop >= number_max) {
+        number_loop = number_min - 1
+    }
+    data.index_2 = data.postfix ? data.index_1 : ++number_loop
+
+    data.index_1 = data.index_1.toString().padStart(4, "0");
+    data.index_2 = data.index_2.toString().padStart(4, "0");
+    // NUMBER LOOP END
+
+    // DATE START
+    let dateArray = date.format('LL').split(' ')
+    data.day = dateArray[0]
+    data.month = dateArray[1]
+    data.year = dateArray[2]
+    // DATE END
+
+    let obj = {
+        fileName: `${date.format('L')} (${data.index_1}-${data.index_2}) ` + data.file_name,
+        dataFile: data, 
+        folderName: date.format('L')
+    }
+    return obj
 }
 
-async function renderWorksheet(fileName, buffer, data, dateLoop) {
-    try {
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(buffer)
-        var worksheet = workbook.worksheets[0]; 
-        let count = 0
-        Object.keys(data).map(data_key => {
-            if (!reserved_data_keys.includes(data_key)) {
-                worksheet.eachRow(function (row, rowNumber) {
-                    row.eachCell(function (cell, colNumber) {
-                        let replace = `#${data_key}#`;
-                        let replace_regex = new RegExp(replace, 'g')
-                        if (cell.value && cell.value.formula) {
-                            let curretValue = cell.value.result.toString()
-                            cell.value = { formula: cell.value.formula, result: curretValue.replace(replace_regex, data[data_key]) }
-                        }
-                        if (cell.value && typeof cell.value == 'string') {
-                            let curretValue = cell.value.toString()
-                            cell.value = curretValue.replace(replace_regex, data[data_key]);
-                        }
-                    });
-                });
-            }
-        })
+async function renderWorksheet(dateLoop, data) {
+    let workbook = new ExcelJS.Workbook();
+    
+    await workbook.xlsx.load(template_buffer)
+    var worksheet = workbook.worksheets[0];
 
-        let file_path = path.join(`${moment(dateLoop).format('L')}`, fileName + '.xlsx')
-        let buffer_res = await workbook.xlsx.writeBuffer()
-        updateZipArchive(file_path, buffer_res)
-    } catch (error) {
-        logger.error('ExcelJS - UPDATE', 'Processed with errors: %j', error)
-    }
+    let obj = getObjectXLSX(dateLoop, data)
+    Object.keys(obj.dataFile).map(data_key => {
+        if (!reserved_data_keys.includes(data_key)) {
+            worksheet.eachRow(function (row, rowNumber) {
+                row.eachCell(function (cell, colNumber) {
+                    let replace = `#${data_key}#`;
+                    let replace_regex = new RegExp(replace, 'g')
+                    if (cell.value && cell.value.formula) {
+                        let curretValue = cell.value.result.toString()
+                        cell.value = { formula: cell.value.formula, result: curretValue.replace(replace_regex, obj.dataFile[data_key]) }
+                    }
+                    if (cell.value && typeof cell.value == 'string') {
+                        let curretValue = cell.value.toString()
+                        cell.value = curretValue.replace(replace_regex, obj.dataFile[data_key]);
+                    }
+                });
+            });
+        }
+    })
+
+    let buffer_res = await workbook.xlsx.writeBuffer()
+    zip.addFile(path.join(`${obj.folderName}`, obj.fileName + '.xlsx'), buffer_res);
 }
 
 async function sendFileToEmail(email) {
@@ -198,7 +197,7 @@ async function sendFileToEmail(email) {
         ]
     });
 
-    fs.unlink(zip_path)
+    // fs.unlinkSync(zip_path)
     logger.info("MAIL", "Message sent: %s", info.messageId);
 }
 
