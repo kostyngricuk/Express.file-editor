@@ -17,19 +17,18 @@ moment.locale('ru')
 const resault_folder = 'uploads'
 const reserved_data_keys = ['file_name']
 
-const zip = new AdmZip();
-var zip_path = path.join(resault_folder, `${moment(Date.now()).format('L')}.zip`)
-
-
-var data_json, template_buffer, data_path, number_start, date_start, date_end, email = null
-var number_min = 1
-var number_max = 999
+const number_min = 1
+const number_max = 999
 var number_loop = 0
 
-var res_buffers = []
 /* GET xlsx */
 router.route('/')
     .post((req, res, next) => {
+        const zip = new AdmZip();
+        const zip_path = path.join(resault_folder, `${moment(Date.now()).format('L')}.zip`)
+        
+        
+        let data_json, template_buffer, data_path, number_start, date_start, date_end, email = null
         new formidable.IncomingForm().parse(req)
             .on('field', (name, field) => {
                 // logger.info('XLSX', `Field name: ${name}, Field value: ${field}`)
@@ -77,7 +76,7 @@ router.route('/')
                     while (date_loop <= date_end) {
                         let date = moment(date_loop)
                         Array.from(data_json).map((data, index) => {
-                            promises.push(renderWorksheet(date, data))
+                            promises.push(renderWorksheet(zip, template_buffer, date, data))
                         })
 
                         logger.info('XLSX', date.format('L') + ' - Loading ...')
@@ -89,7 +88,7 @@ router.route('/')
                         zip.writeZip(zip_path);
 
                         // send files to email
-                        sendFileToEmail(email).catch(console.error);
+                        sendFileToEmail(zip_path, email).catch(console.error);
 
                         // response
                         logger.info('XLSX', 'Processed successfully!')
@@ -139,7 +138,7 @@ function getObjectXLSX(date, data) {
     return obj
 }
 
-async function renderWorksheet(dateLoop, data) {
+async function renderWorksheet(zip, template_buffer, dateLoop, data) {
     let workbook = new ExcelJS.Workbook();
     
     await workbook.xlsx.load(template_buffer)
@@ -169,7 +168,7 @@ async function renderWorksheet(dateLoop, data) {
     zip.addFile(path.join(`${obj.folderName}`, obj.fileName + '.xlsx'), buffer_res);
 }
 
-async function sendFileToEmail(email) {
+async function sendFileToEmail(zip_path, email) {
     let mailConfig;
     
     mailConfig = {
