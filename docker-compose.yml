@@ -5,6 +5,5 @@ services:
     environment:
       - BACKEND_PORT=${BACKEND_PORT}
       - PORT=${PORT}
-      - HOST=${HOST}
     ports:
       - "${PORT}:${BACKEND_PORT}"
