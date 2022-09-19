@@ -181,6 +181,8 @@ async function sendFileToEmail(zip_path, email) {
             pass: process.env.SMTP_PASSWORD,
         }
     };
+    
+    logger.info("MAIL", "config: %s", mailConfig);
 
     let transporter = nodemailer.createTransport(mailConfig);
 
