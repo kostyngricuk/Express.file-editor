@@ -27,7 +27,7 @@ var server = http.createServer(app);
  */
 
 server.listen(port, () => {
-  logger.http('APP', `Listening at http://${process.env.HOST || '127.0.0.1'}:${process.env.PORT || '50001'}`);
+  logger.http('APP', `Listening at http://localhost:${process.env.PORT || '50001'}`);
 });
 server.on('error', onError);
 server.on('listening', onListening);
