@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  node:
+    build: .
+    environment:
+      - BACKEND_PORT=${BACKEND_PORT}
+      - PORT=${PORT}
+      - HOST=${HOST}
+    ports:
+      - "${PORT}:${BACKEND_PORT}"
